@@ -1,0 +1,53 @@
+version: "3"
+
+services:
+
+  nginxapplication:
+    build:
+      context: ./nginx
+      dockerfile: Dockerfile.prod  
+    image: williammacedo/nginx:prod
+    container_name: nginxapplication
+    networks:
+      - node-network
+    ports:
+      - "8080:80"
+    depends_on: 
+        - mysqlapplication
+        - nodejsapplication  
+
+  nodejsapplication:
+    build: 
+      context: ./node
+      dockerfile: Dockerfile.prod  
+    container_name: nodejsapplication
+    entrypoint: dockerize -wait tcp://mysqlapplication:3306 -timeout 20s node index.js
+    networks:
+      - node-network
+    volumes:
+      - ./node:/usr/src/app
+    tty: true
+    depends_on:
+      - mysqlapplication
+
+  mysqlapplication:
+    build:
+      context: ./db
+      dockerfile: Dockerfile.prod  
+    image: mysql:5.7
+    command: --innodb-use-native-aio=0
+    container_name: mysqlapplication
+    restart: always
+    tty: true
+    volumes:
+      - ./mysql:/var/lib/mysql
+      - ./db:/docker-entrypoint-initdb.d
+    environment:
+      - MYSQL_DATABASE=nodedb
+      - MYSQL_ROOT_PASSWORD=root
+    networks:
+      - node-network
+
+networks:
+  node-network:
+    driver: bridge
